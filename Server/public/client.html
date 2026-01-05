@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Board WebSocket Client</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h1 { color: #333; }
+        #stats {
+            margin-bottom: 10px;
+            padding: 5px 10px;
+            border: 1px solid #ccc;
+            background: #f1f1f1;
+            display: flex;
+            gap: 15px;
+        }
+        #controls { margin-bottom: 10px; }
+        #log {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 400px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            margin-bottom: 20px;
+            scroll-behavior: smooth;
+        }
+        .event { margin-bottom: 5px; padding: 5px; border-bottom: 1px dashed #ccc; white-space: pre-wrap; }
+        .TASK_CREATED { color: green; }
+        .TASK_UPDATED { color: orange; }
+        .TASK_DELETED { color: red; }
+        .status-OPEN { font-weight: bold; color: green; }
+        .status-IN_PROGRESS { font-weight: bold; color: orange; }
+        .status-DONE { font-weight: bold; color: red; }
+        .info { color: #555; }
+        .error { color: red; font-weight: bold; }
+        .ws-event { background-color: #e6f7ff; }   /* WebSocket події світло-блакитні */
+        .rest-event { background-color: #fff7e6; } /* REST події світло-жовті */
+        form { margin-bottom: 10px; }
+        input, button, select { margin: 2px; padding: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Task Board WebSocket Client</h1>
+
+    <div id="stats">
+        <span id="createdCount">Created: 0</span>
+        <span id="updatedCount">Updated: 0</span>
+        <span id="deletedCount">Deleted: 0</span>
+    </div>
+
+    <div id="controls">
+        <button id="clearLogBtn">Clear Log</button>
+        <label>Filter:
+            <select id="filterSelect">
+                <option value="all">All</option>
+                <option value="TASK_CREATED">Created</option>
+                <option value="TASK_UPDATED">Updated</option>
+                <option value="TASK_DELETED">Deleted</option>
+                <option value="info">Info</option>
+                <option value="error">Error</option>
+            </select>
+        </label>
+    </div>
+
+    <div id="log"></div>
+
+    <h2>Create Task</h2>
+    <form id="createForm">
+        <input type="text" id="createTitle" placeholder="Title" required>
+        <input type="text" id="createDesc" placeholder="Description">
+        <button type="submit">Create</button>
+    </form>
+
+    <h2>Update Task</h2>
+    <form id="updateForm">
+        <input type="number" id="updateId" placeholder="Task ID" required>
+        <input type="text" id="updateTitle" placeholder="New Title">
+        <input type="text" id="updateDesc" placeholder="New Description">
+        <input type="text" id="updateStatus" placeholder="Status (OPEN, IN_PROGRESS, DONE)">
+        <button type="submit">Update</button>
+    </form>
+
+    <h2>Delete Task</h2>
+    <form id="deleteForm">
+        <input type="number" id="deleteId" placeholder="Task ID" required>
+        <button type="submit">Delete</button>
+    </form>
+
+    <script>
+        const clientId = Math.floor(Math.random() * 1000);
+        const ws = new WebSocket("ws://localhost:3000");
+        const logDiv = document.getElementById("log");
+        const AUTH_TOKEN = "mysecrettoken";
+
+        const stats = { created: 0, updated: 0, deleted: 0 };
+        const createdEl = document.getElementById("createdCount");
+        const updatedEl = document.getElementById("updatedCount");
+        const deletedEl = document.getElementById("deletedCount");
+
+        function updateStats(type) {
+            if (type === "TASK_CREATED") stats.created++;
+            if (type === "TASK_UPDATED") stats.updated++;
+            if (type === "TASK_DELETED") stats.deleted++;
+            createdEl.textContent = `Created: ${stats.created}`;
+            updatedEl.textContent = `Updated: ${stats.updated}`;
+            deletedEl.textContent = `Deleted: ${stats.deleted}`;
+        }
+
+        function getTime() {
+            return new Date().toLocaleTimeString();
+        }
+
+        function addLog(message, type="info", source="ws") {
+            const p = document.createElement("div");
+            p.className = `event ${type} ${source}-event`;
+            p.dataset.type = type;
+            p.textContent = `[${getTime()}] (Client ${clientId}) ${message}`;
+            logDiv.appendChild(p);
+            applyFilter();
+            logDiv.scrollTop = logDiv.scrollHeight;
+            if (["TASK_CREATED","TASK_UPDATED","TASK_DELETED"].includes(type)) updateStats(type);
+        }
+
+        function applyFilter() {
+            const filter = document.getElementById("filterSelect").value;
+            document.querySelectorAll("#log .event").forEach(ev => {
+                ev.style.display = (filter === "all" || ev.dataset.type === filter) ? "block" : "none";
+            });
+        }
+
+        document.getElementById("filterSelect").onchange = applyFilter;
+        document.getElementById("clearLogBtn").onclick = () => logDiv.innerHTML = "";
+
+        // --- WebSocket ---
+        ws.onopen = () => addLog("Connected to WebSocket server", "info", "ws");
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            let type = data.type || "info";
+
+            if (data.task) {
+                const statusClass = `status-${data.task.status || "OPEN"}`;
+                addLog(`${type}: ${JSON.stringify(data.task, null, 2)}`, statusClass, "ws");
+            } else if (data.taskId) {
+                addLog(`${type}: Task ID ${data.taskId} deleted`, "TASK_DELETED", "ws");
+            } else if (data.message) {
+                addLog(`Server: ${data.message}`, "info", "ws");
+            }
+        };
+        ws.onclose = () => addLog("Disconnected from server", "info", "ws");
+        ws.onerror = (err) => addLog("WebSocket error: " + err.message, "error", "ws");
+
+        // --- REST helper ---
+        async function sendREST(method, url, body) {
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${AUTH_TOKEN}`
+                    },
+                    body: body ? JSON.stringify(body) : undefined
+                });
+
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(`REST error: ${res.status} ${res.statusText} ${data.error || ""}`);
+                addLog(`REST ${method} ${url}: ${JSON.stringify(data, null, 2)}`, "info", "rest");
+            } catch (err) {
+                addLog(err.message, "error", "rest");
+            }
+        }
+
+        // --- Form handlers ---
+        document.getElementById("createForm").onsubmit = e => {
+            e.preventDefault();
+            const title = document.getElementById("createTitle").value.trim();
+            const desc = document.getElementById("createDesc").value.trim();
+            sendREST("POST", "http://localhost:3000/tasks", { title, description: desc });
+        };
+
+        document.getElementById("updateForm").onsubmit = e => {
+            e.preventDefault();
+            const id = parseInt(document.getElementById("updateId").value);
+            const title = document.getElementById("updateTitle").value.trim();
+            const desc = document.getElementById("updateDesc").value.trim();
+            const status = document.getElementById("updateStatus").value.trim();
+            sendREST("PUT", `http://localhost:3000/tasks/${id}`, { title, description: desc, status });
+        };
+
+        document.getElementById("deleteForm").onsubmit = e => {
+            e.preventDefault();
+            const id = parseInt(document.getElementById("deleteId").value);
+            sendREST("DELETE", `http://localhost:3000/tasks/${id}`);
+        };
+    </script>
+</body>
+</html>

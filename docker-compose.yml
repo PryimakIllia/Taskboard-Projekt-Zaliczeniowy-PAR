@@ -1,0 +1,17 @@
+services:
+  taskboard-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      AUTH_TOKEN: mysecrettoken
+    networks:
+      - taskboard-net
+
+networks:
+  taskboard-net:
+    driver: bridge

@@ -105,25 +105,26 @@ file://<ścieżka_projektu>/server/public/client.html
 Można otworzyć kilka zakładek jako różni klienci WebSocket.
 
 REST API test
-Pobranie wszystkich zadań:
 
+Pobranie wszystkich zadań:
 GET http://localhost:3000/tasks
 Authorization: Bearer mysecrettoken
-Dodanie zadania:
 
+Dodanie zadania:
 POST http://localhost:3000/tasks
 Authorization: Bearer mysecrettoken
 Body: { "title": "Test", "description": "Desc" }
-Aktualizacja zadania:
 
+Aktualizacja zadania:
 PUT http://localhost:3000/tasks/:id
 Authorization: Bearer mysecrettoken
 Body: { "title": "...", "description": "...", "status": "DONE" }
-Usunięcie zadania:
 
+Usunięcie zadania:
 DELETE http://localhost:3000/tasks/:id
 Authorization: Bearer mysecrettoken
-5.2 Docker
+
+### 5.2 Docker
 Budowanie i uruchomienie kontenera:
 
 docker compose up --build
@@ -133,7 +134,7 @@ http://localhost:3000/
 Klient przeglądarkowy:
 
 http://localhost:3000/client.html
-6. Problemy i sposoby ich rozwiązania
+## 6. Problemy i sposoby ich rozwiązania
 Brak tokena w nagłówku REST → zwracany błąd 401 Unauthorized. Rozwiązanie: dodać nagłówek Authorization: Bearer <token>.
 
 Nieistniejący ID zadania → zwracany błąd 404 Not Found. Rozwiązanie: obsługa błędów w routerze REST.
@@ -142,7 +143,7 @@ WebSocket nie działa w Dockerze → upewnić się, że port 3000 jest otwarty i
 
 Brak bazy danych → dane przechowywane w pamięci. Możliwość przyszłego rozszerzenia projektu o bazę (MongoDB, SQLite, PostgreSQL).
 
-7. Uwagi
+## 7. Uwagi
 Dane przechowywane w pamięci, brak bazy danych
 
 Obsługa wielu klientów jednocześnie przez WebSocket
@@ -155,7 +156,7 @@ Docker umożliwia szybkie uruchomienie projektu bez instalowania Node.js
 
 Projekt demonstruje hybrydowy model komunikacji: synchroniczna + asynchroniczna
 
-8. Podsumowanie
+## 8. Podsumowanie
 Projekt jest kompletny i funkcjonalny:
 
 REST API do operacji CRUD
@@ -168,6 +169,6 @@ Docker + Node.js
 
 Można go łatwo rozbudować, np. dodając bazę danych lub kolejkę wiadomości do obsługi zadań w tle.
 
-9. Autor
+## 9. Autor
 Illia Pryimak 
 Numer Indeksu: 164657
